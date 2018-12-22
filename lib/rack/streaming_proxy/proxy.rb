@@ -108,7 +108,7 @@ private
 
   def log_rack_error(env, e)
     env['rack.errors'].puts e.message
-    env['rack.errors'].puts e.backtrace #.collect { |line| "\t" + line }
+    # env['rack.errors'].puts e.backtrace #.collect { |line| "\t" + line }
     env['rack.errors'].flush
   end
 
