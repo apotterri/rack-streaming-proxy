@@ -101,7 +101,7 @@ private
     # to_hash requires the values to be joined with a comma.
     headers = {}
     response.each_header { |key, value| headers[key] = value }
-    log_headers :debug, 'Proxy Response Headers:', headers
+    # log_headers :debug, 'Proxy Response Headers:', headers
     @piper.puts headers
 
     response.read_body { |chunk| @piper.puts chunk }

@@ -40,7 +40,7 @@ private
       request.content_type   = current_request.content_type   if current_request.content_type
     end
 
-    log_headers :debug, 'Current Request Headers', current_request.env
+    # log_headers :debug, 'Current Request Headers', current_request.env
 
     current_headers = current_request.env.reject { |key, value| !(key.match /^HTTP_/) }
     current_headers.each do |key, value|
@@ -49,7 +49,7 @@ private
     end
     request['X-Forwarded-For'] = (current_request.env['X-Forwarded-For'].to_s.split(/, +/) + [current_request.env['REMOTE_ADDR']]).join(', ')
 
-    log_headers :debug, 'Proxy Request Headers:', request
+    # log_headers :debug, 'Proxy Request Headers:', request
 
     request
   end
