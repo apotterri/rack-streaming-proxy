@@ -64,7 +64,8 @@ class Rack::StreamingProxy::Proxy
 
     # Decide whether this request should be proxied.
     if destination_uri = @block.call(current_request)
-      self.class.log :info, "Starting proxy request to: #{destination_uri}"
+      client_port = env['puma.socket']&.peeraddr[1]
+      self.class.log :info, "[ #{client_port} ] Starting proxy request to: #{destination_uri}"
 
       request  = Rack::StreamingProxy::Request.new(destination_uri, current_request)
       begin
@@ -95,7 +96,7 @@ class Rack::StreamingProxy::Proxy
         response.headers.delete('Transfer-Encoding')
       end
 
-      self.class.log :info, "Finishing proxy request to: #{destination_uri}"
+      self.class.log :info, "[ #{client_port} ] Finishing proxy request to: #{destination_uri}"
       [response.status, response.headers, response]
 
     # Continue down the middleware stack if the request is not to be proxied.
@@ -107,7 +108,8 @@ class Rack::StreamingProxy::Proxy
 private
 
   def log_rack_error(env, e)
-    env['rack.errors'].puts e.message
+    client_port = env['puma.socket']&.peeraddr[1]
+    env['rack.errors'].puts "[ #{client_port} ] #{e.message}"
     # env['rack.errors'].puts e.backtrace #.collect { |line| "\t" + line }
     env['rack.errors'].flush
   end

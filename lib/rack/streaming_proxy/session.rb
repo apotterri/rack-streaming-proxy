@@ -7,6 +7,7 @@ class Rack::StreamingProxy::Session
 
   def initialize(request)
     @request = request
+    @client_port = request.current_request.env['puma.socket']&.peeraddr[1]
   end
 
   # Returns a Rack::StreamingProxy::Response
@@ -20,7 +21,7 @@ private
 
   def child
     begin
-      Rack::StreamingProxy::Proxy.log :debug, "Child starting request to #{@request.uri}"
+      Rack::StreamingProxy::Proxy.log :debug, "[ #{@client_port} ] Child #{Process.pid} starting request to #{@request.uri}"
       perform_request
 
     rescue Exception => e
@@ -32,16 +33,16 @@ private
       @piper.puts e # Pass on the exception to the parent.
 
     ensure
-      Rack::StreamingProxy::Proxy.log :debug, "Child process #{Process.pid} closing connection."
+      Rack::StreamingProxy::Proxy.log :debug, "[ #{@client_port} ] Child process #{Process.pid} closing connection."
       @piper.close
 
-      Rack::StreamingProxy::Proxy.log :info, "Child process #{Process.pid} exiting."
+      Rack::StreamingProxy::Proxy.log :info, "[ #{@client_port} ] Child process #{Process.pid} exiting."
       exit!(0) # child needs to exit, always.
     end
   end
 
   def parent
-    Rack::StreamingProxy::Proxy.log :info, "Parent process #{Process.pid} forked a child process #{@piper.pid}."
+    Rack::StreamingProxy::Proxy.log :info, "[ #{@client_port} ] Parent process #{Process.pid} forked a child process #{@piper.pid}."
 
     response = Rack::StreamingProxy::Response.new(@piper)
     return response
@@ -60,11 +61,11 @@ private
       loop do
         session.request(@request.http_request) do |response|
           # At this point the headers and status are available, but the body has not yet been read.
-          Rack::StreamingProxy::Proxy.log :debug, "Child got response: #{response.class.name}"
+          Rack::StreamingProxy::Proxy.log :debug, "[ #{@client_port} ] Child got response: #{response.class.name}"
 
           if response.class <= Net::HTTPServerError # Includes Net::HTTPServiceUnavailable, Net::HTTPInternalServerError
             if retries <= Rack::StreamingProxy::Proxy.num_retries_on_5xx
-              Rack::StreamingProxy::Proxy.log :info, "Child got #{response.code}, retrying (Retry ##{retries})"
+              Rack::StreamingProxy::Proxy.log :info, "[ #{@client_port} ] Child got #{response.code}, retrying (Retry ##{retries})"
               sleep 1
               retries += 1
               next
@@ -72,7 +73,7 @@ private
           end
           stop = true
 
-          Rack::StreamingProxy::Proxy.log :debug, "Child process #{Process.pid} returning Status = #{response.code}."
+          Rack::StreamingProxy::Proxy.log :debug, "[ #{@client_port} ] Child process #{Process.pid} returning Status = #{response.code}."
 
           process_response(response)
         end
@@ -87,7 +88,7 @@ private
     # Raise an exception if the raise_on_5xx config is set, and the response is a 5xx.
     # Otherwise continue and put the error body in the pipe. (e.g. Apache error page, for example)
     if response.class <= Net::HTTPServerError && Rack::StreamingProxy::Proxy.raise_on_5xx
-      raise Rack::StreamingProxy::HttpServerError.new "Got a #{response.class.name} (#{response.code}) response while proxying to #{@request.uri}"
+      raise Rack::StreamingProxy::HttpServerError.new "[ #{@client_port} ] Got a #{response.class.name} (#{response.code}) response while proxying to #{@request.uri}"
     end
 
     # Put the response in the parent's pipe.
